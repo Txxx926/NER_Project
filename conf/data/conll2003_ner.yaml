@@ -1,0 +1,17 @@
+datamodule:
+  _target_: data.pl_data_modules.NERDataModule
+
+  language_model_name: ${model.model.language_model}
+  dataset:
+    _target_: data.datasets.CoNLL2003NERDataset
+    max_length: 256
+
+  batch_sizes:
+    train: 32
+    dev: 32
+    test: 32
+
+  num_workers:
+    train: 4
+    dev: 4
+    test: 4
