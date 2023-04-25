@@ -4,9 +4,9 @@ import torch
 import torch.nn.functional as F
 import transformers_embedder as tre
 from data.labels import Labels
-
+from models.crf import CRF
 from models.viterbi import ViterbiDecoder
-
+from models.focal_loss import FocalLoss
 
 class TransformersNER(torch.nn.Module):
     def __init__(
@@ -19,6 +19,8 @@ class TransformersNER(torch.nn.Module):
         dropout: float = 0.2,
         projection_size: int = 512,
         use_viterbi: bool = True,
+        use_crf:bool=False,
+        use_focal_loss:bool=False,
         *args,
         **kwargs,
     ) -> None:
@@ -46,6 +48,9 @@ class TransformersNER(torch.nn.Module):
         self.classifier = torch.nn.Linear(projection_size, self.labels.get_label_size())
         # output viterbi decoder
         self.viterbi_decoder = ViterbiDecoder(self.labels) if use_viterbi else None
+        self.crf=CRF(labels.get_label_size(),batch_first=True) if use_crf else None
+        self.use_focal_loss=use_focal_loss
+        self.focal_loss= FocalLoss(gamma=0.7) if use_focal_loss else None
 
     def forward(
         self,
@@ -88,22 +93,41 @@ class TransformersNER(torch.nn.Module):
             "scatter_offsets": scatter_offsets,
         }
         embeddings = self.transformer(**model_kwargs).word_embeddings
+        #print(embeddings.shape)
         logits = self.linears(embeddings)
+
         logits = self.classifier(logits)
-
+        #if self.crf:
+        #    logits=self.crf.forward(logits,labels,attention_mask.bool())
         output = {"logits": logits}
-
+        #print(attention_mask.shape)
+        #print(input_ids.shape)
+        #print(logits.shape)
+        #print(labels.shape)
+        sen_len=logits.shape[1]
+        #print(sen_len)
+        #print("mask",attention_mask)
+        #print("label in training",labels)
         if compute_predictions:
-            if self.viterbi_decoder:
+            if self.crf:
+                predictions= self.crf.decode(logits)
+                #print("prediction:",predictions)
+            elif self.viterbi_decoder:
                 predictions = [self.viterbi_decoder(l) for l in logits.cpu()]
                 predictions = [pred[0] for pred in predictions]
             else:
                 predictions = logits.argmax(dim=-1)
             output["predictions"] = predictions
-
+        #print("label after training",labels) 
+        #old_labels=labels.clone()
         if compute_loss and labels is not None:
-            output["loss"] = self.compute_loss(logits, labels)
-
+            if self.crf:
+                print("label before crf",labels) 
+                output["loss"] =self.crf(logits,labels.clone())
+                print("label after crf",labels) 
+            else:
+                output["loss"] = self.compute_loss(logits, labels)
+        #labels=old_labels
         return output
 
     def compute_loss(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
@@ -119,6 +143,12 @@ class TransformersNER(torch.nn.Module):
         Returns:
             obj:`torch.Tensor`: The loss of the model.
         """
-        return F.cross_entropy(
-            logits.view(-1, self.labels.get_label_size()), labels.view(-1)
-        )
+        if self.use_focal_loss:
+            print('use focal loss')
+            #m = F.softmax(logits,dim=-1)
+            #print(m.shape,labels.shape)
+            return self.focal_loss(logits, labels)
+        else:
+            return F.cross_entropy(
+                logits.view(-1, self.labels.get_label_size()), labels.view(-1)
+            )

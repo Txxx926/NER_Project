@@ -46,11 +46,15 @@ class NERModule(pl.LightningModule):
         }
         batch_size = len(batch.input_ids)
         # get output from model
+        old_labels=batch["labels"].clone().detach()
+        #print('before labels',batch["labels"])
         outputs = self.forward(**val_kwargs)
         self.log("val_loss", outputs["loss"], batch_size=batch_size, sync_dist=True)
-
+        #batch["labels"]=old_labels 
         # compute f1 score
-        print(batch["labels"])
+        #print('output',outputs['predictions'])
+        #print('labels',batch["labels"])
+
         metrics = self.compute_f1_score(
             outputs["predictions"], batch["labels"], batch["sentence_lengths"]
         )
@@ -73,6 +77,7 @@ class NERModule(pl.LightningModule):
         }
         batch_size = len(batch.input_ids)
         # get output from model
+
         outputs = self.forward(**test_kwargs)
         self.log("test_loss", outputs["loss"], batch_size=batch_size)
         # compute f1 score
@@ -106,12 +111,12 @@ class NERModule(pl.LightningModule):
         id2labels=(self.labels._index_to_labels)["labels"]
         labels2id=(self.labels._labels_to_index)["labels"]
         true_predictions=[
-           [id2labels[p] for p,l in zip(pred,lab) if l!=-100 ]
+           [id2labels[int(p)] for p,l in zip(pred,lab) if l!=-100 ]
            for  pred, lab in zip(predictions, labels)
         ]
 
         true_labels=[
-            [id2labels[l] for p,l in zip(pred,lab) if l!=-100 ]
+            [id2labels[int(l)] for p,l in zip(pred,lab) if l!=-100 ]
            for  pred, lab in zip(predictions,labels) 
         ]
 

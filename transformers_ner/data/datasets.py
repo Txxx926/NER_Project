@@ -92,7 +92,7 @@ class CoNLL2012NERDataset(Dataset):
         self,
         dataset_name: str = "conll2012_ontonotesv5",
         max_length: int = 128,
-        version: str = "english_v12",
+        version: str = "english_v12",#"english_v12",
         **kwargs,
     ):
         super().__init__(dataset_name, max_length)

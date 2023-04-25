@@ -31,7 +31,7 @@ class NERDataModule(pl.LightningDataModule):
         self.batch_sizes = batch_sizes
         self.num_workers = num_workers
         # tokenizer
-        self.tokenizer = tre.Tokenizer(language_model_name, *args, **kwargs)
+        self.tokenizer = tre.Tokenizer(language_model_name, *args,add_prefix_space=True, **kwargs)
 
     def prepare_data(self, *args, **kwargs):
         if isinstance(self.dataset, DictConfig):

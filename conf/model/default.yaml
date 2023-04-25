@@ -8,6 +8,8 @@ model:
   fine_tune: True
   dropout: 0.1
   use_viterbi: True
+  use_crf: False
+  use_focal_loss: False
 
 optim_params:
   optimizer: "radam"
